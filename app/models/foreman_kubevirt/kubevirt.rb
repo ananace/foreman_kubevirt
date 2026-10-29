@@ -100,10 +100,13 @@ module ForemanKubevirt
     end
 
     def find_vm_by_uuid(uuid)
-      super
-    rescue Fog::Kubevirt::Errors::NotFoundError
-      # Default server lookup only finds running VMs, so also look for a stopped one
-      client.vms.get(uuid)
+      # Default client.servers lookup will only find running VMs, so use client.vms instead to also find stopped ones
+      begin
+        client.vms.get(uuid)
+      rescue Fog::Kubevirt::Errors::NotFoundError
+        # Attempt a check for a running vmi lacking a backing vm as well
+        super
+      end
     rescue Fog::Kubevirt::Errors::ClientError => e
       Foreman::Logging.exception("Failed retrieving KubeVirt vm by uuid #{uuid}", e)
       raise ActiveRecord::RecordNotFound
@@ -183,8 +186,8 @@ module ForemanKubevirt
       logger.debug("creating VM with the following options: #{options.inspect}")
 
       # Build bootloader and TPM configuration
-      extra_domain = process_firmware_attributes(args[:firmware], args[:firmware_type].to_s, args[:provision_method])
-      extra_domain[:devices] = { tpm: { persistent: Foreman::Cast.to_bool(args[:tpm_persist]) } } if Foreman::Cast.to_bool(args[:tpm_enabled])
+      extra_domain = process_firmware_attributes(options[:firmware], options[:firmware_type].to_s, options[:provision_method])
+      extra_domain[:devices] = { tpm: { persistent: Foreman::Cast.to_bool(options[:tpm_persist]) } } if Foreman::Cast.to_bool(options[:tpm_enabled])
 
       # Add clound init user data
       user_data = options[:user_data]

@@ -149,11 +149,13 @@ class ForemanKubevirtTest < ActiveSupport::TestCase
     vm_args.delete("cpu_cores")
     Fog.mock!
     compute_resource = new_kubevirt_vcr
+    vms_stubbed = compute_resource.send(:client).vms
+    vms_stubbed.expects(:create).with { |args| args[:cpus] == 1 }
+    compute_resource.send(:client).stubs(:vms).returns(vms_stubbed)
     server = compute_resource.create_vm(vm_args)
 
-    # verify default CPU value is set
-    # fog-kubevirt mock values does not include any CPU cores in get_raw_vm
-    assert_nil server.cpu_cores
+    # fog-kubevirt VCR values for client.vms.get do not include any CPU cores, so there's no use checking the return value
+    assert_not_nil server
   end
 
   test "create_vm without memory should pass" do
